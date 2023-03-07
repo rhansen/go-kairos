@@ -94,9 +94,9 @@ func timerRoutine() {
 	var now time.Time
 	var last int
 
-	var sleepTimerActive bool
-	sleepTimer := time.NewTimer(time.Second)
-	sleepTimer.Stop()
+	sleepTimer := time.NewTimer(0)
+	<-sleepTimer.C
+	sleepTimerActive := false
 
 Loop:
 	for {
