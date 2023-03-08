@@ -17,10 +17,6 @@ type Timer struct {
 	// f is called in a locked context on timeout. This function must not block
 	// and must behave well-defined.
 	f func(t *time.Time)
-
-	// reset is called in a locked context. This function must not block
-	// and must behave well-defined.
-	reset func()
 }
 
 // NewTimer creates a new Timer that will send the current time on its
@@ -40,13 +36,6 @@ func NewStoppedTimer() *Timer {
 			// Don't block.
 			select {
 			case c <- *t:
-			default:
-			}
-		},
-		reset: func() {
-			// Empty the channel if filled.
-			select {
-			case <-c:
 			default:
 			}
 		},
