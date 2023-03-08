@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	mutex       sync.Mutex
-	timers      []*Timer
 	rescheduleC = make(chan struct{}, 1)
+	mutex       sync.Mutex // protects:
+	timers      []*Timer
 )
 
 func init() {
