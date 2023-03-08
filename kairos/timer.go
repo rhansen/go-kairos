@@ -16,7 +16,7 @@ type Timer struct {
 
 	// f is called in a locked context on timeout. This function must not block
 	// and must behave well-defined.
-	f func(t *time.Time)
+	f func(t time.Time)
 }
 
 // NewTimer creates a new Timer that will send the current time on its
@@ -32,10 +32,10 @@ func NewStoppedTimer() *Timer {
 	c := make(chan time.Time, 1)
 	t := &Timer{
 		C: c,
-		f: func(t *time.Time) {
+		f: func(t time.Time) {
 			// Don't block.
 			select {
-			case c <- *t:
+			case c <- t:
 			default:
 			}
 		},

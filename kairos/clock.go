@@ -139,7 +139,7 @@ Loop:
 		}
 
 		// Timer expired. Trigger the timer's function callback.
-		t.f(&now)
+		t.f(now)
 
 		// Remove from heap.
 		last = len(timers) - 1
