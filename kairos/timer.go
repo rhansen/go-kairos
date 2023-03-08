@@ -20,7 +20,7 @@ type Timer struct {
 // channel after at least duration d.
 func NewTimer(d time.Duration) *Timer {
 	t := NewStoppedTimer()
-	addTimer(t, d)
+	realClock.addTimer(t, d)
 	return t
 }
 
@@ -39,7 +39,7 @@ func (t *Timer) Stop() (wasActive bool) {
 	if t.c == nil {
 		panic("timer: Stop called on uninitialized Timer")
 	}
-	return delTimer(t)
+	return realClock.delTimer(t)
 }
 
 // Reset changes the timer to expire after duration d.
@@ -51,5 +51,5 @@ func (t *Timer) Reset(d time.Duration) bool {
 	if t.c == nil {
 		panic("timer: Reset called on uninitialized Timer")
 	}
-	return resetTimer(t, d)
+	return realClock.resetTimer(t, d)
 }
