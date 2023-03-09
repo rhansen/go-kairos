@@ -19,15 +19,12 @@ type Timer struct {
 // NewTimer creates a new Timer that will send the current time on its
 // channel after at least duration d.
 func NewTimer(d time.Duration) *Timer {
-	t := NewStoppedTimer()
-	realClock.addTimer(t, d)
-	return t
+	return realClock.NewTimer(d)
 }
 
 // NewStoppedTimer creates a new stopped Timer.
 func NewStoppedTimer() *Timer {
-	c := make(chan time.Time, 1)
-	return &Timer{C: c, c: c}
+	return realClock.NewStoppedTimer()
 }
 
 // Stop prevents the Timer from firing.
