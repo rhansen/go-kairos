@@ -67,6 +67,7 @@ func delTimerLocked(t *Timer) bool {
 		siftupTimer(i)
 		siftdownTimer(i)
 	}
+	t.i = -1 // mark as removed
 	return true
 }
 
@@ -97,7 +98,6 @@ func reschedule() {
 
 func timerRoutine() {
 	var now time.Time
-	var last int
 
 	sleepTimer := time.NewTimer(0)
 	<-sleepTimer.C
@@ -145,17 +145,7 @@ Loop:
 		}
 
 		// Remove from heap.
-		last = len(timers) - 1
-		if last > 0 {
-			timers[0] = timers[last]
-			timers[0].i = 0
-		}
-		timers[last] = nil
-		timers = timers[:last]
-		if last > 0 {
-			siftdownTimer(0)
-		}
-		t.i = -1 // mark as removed
+		delTimerLocked(t)
 
 		mutex.Unlock()
 
