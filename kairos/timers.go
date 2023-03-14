@@ -1,4 +1,4 @@
-package timer
+package kairos
 
 import (
 	"sync"

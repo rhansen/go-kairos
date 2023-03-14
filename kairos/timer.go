@@ -1,5 +1,5 @@
-// Package timer is a Go timer implementation with a fixed Reset behavior.
-package timer
+// Package kairos is a Go timer implementation with a fixed Reset behavior.
+package kairos
 
 import (
 	"time"
