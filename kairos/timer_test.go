@@ -10,7 +10,6 @@ import (
 )
 
 func TestNullTimout(t *testing.T) {
-	// Timeout for 0 seconds.
 	start := time.Now()
 	timer := NewTimer(0)
 	<-timer.C
@@ -20,7 +19,6 @@ func TestNullTimout(t *testing.T) {
 }
 
 func TestNegativeTimout(t *testing.T) {
-	// Timeout for -1 seconds.
 	start := time.Now()
 	timer := NewTimer(-1)
 	<-timer.C
@@ -28,7 +26,6 @@ func TestNegativeTimout(t *testing.T) {
 		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
 	}
 
-	// Timeout for -100 seconds.
 	start = time.Now()
 	timer = NewTimer(-100 * time.Second)
 	<-timer.C
@@ -38,7 +35,6 @@ func TestNegativeTimout(t *testing.T) {
 }
 
 func TestTimeValue(t *testing.T) {
-	// Timeout for 0 seconds.
 	start := time.Now()
 	timer := NewTimer(time.Second)
 	v := <-timer.C
@@ -48,7 +44,6 @@ func TestTimeValue(t *testing.T) {
 }
 
 func TestSingleTimout(t *testing.T) {
-	// Timeout for 1 second and wait.
 	start := time.Now()
 	timer := NewTimer(time.Second)
 	<-timer.C
@@ -65,7 +60,6 @@ func TestMultipleTimouts(t *testing.T) {
 		timers = append(timers, NewTimer(time.Second))
 	}
 
-	// Wait for them all to expire.
 	for _, timer := range timers {
 		<-timer.C
 	}
@@ -83,7 +77,6 @@ func TestMultipleDifferentTimouts(t *testing.T) {
 		timers = append(timers, NewTimer(time.Duration(i%4)*time.Second))
 	}
 
-	// Wait for them all to expire.
 	for _, timer := range timers {
 		<-timer.C
 	}
@@ -202,7 +195,6 @@ func TestReset(t *testing.T) {
 }
 
 func TestNegativeReset(t *testing.T) {
-	// Timeout for -1 seconds.
 	start := time.Now()
 	timer := NewTimer(time.Second)
 	timer.Reset(-1)
@@ -211,7 +203,6 @@ func TestNegativeReset(t *testing.T) {
 		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
 	}
 
-	// Timeout for -100 seconds.
 	start = time.Now()
 	timer = NewTimer(time.Second)
 	timer.Reset(-100 * time.Second)
@@ -231,7 +222,6 @@ func TestMultipleResets(t *testing.T) {
 		timer.Reset(2 * time.Second)
 	}
 
-	// Wait for them all to expire.
 	for _, timer := range timers {
 		<-timer.C
 	}
@@ -251,7 +241,6 @@ func TestMultipleZeroResets(t *testing.T) {
 		timer.Reset(0)
 	}
 
-	// Wait for them all to expire.
 	for _, timer := range timers {
 		<-timer.C
 	}
@@ -301,18 +290,18 @@ func TestResetPanic(t *testing.T) {
 func TestResetBehavior(t *testing.T) {
 	start := time.Now()
 
-	// Start a new timer with a timeout of 1 second.
 	timer := NewTimer(1 * time.Second)
 
-	// Wait for 2 seconds.
-	// Meanwhile the timer fired filled the channel.
+	// Let the timer fill the channel.
 	time.Sleep(2 * time.Second)
 
-	// Reset the timer. This should act exactly as creating a new timer.
+	// Reset the timer without draining the channel manually.  The channel should be automatically
+	// drained -- this should behave the same as creating a new timer except the same channel is
+	// reused.
 	timer.Reset(1 * time.Second)
 
-	// However this will fire immediately, because the channel was not drained.
-	// See issue: https://github.com/golang/go/issues/11513
+	// If timer was a *time.Timer, this receive would not block because the channel would not be
+	// drained from the previous fire.  See <https://github.com/golang/go/issues/11513>.
 	<-timer.C
 
 	if int(time.Since(start).Seconds()) != 3 {
