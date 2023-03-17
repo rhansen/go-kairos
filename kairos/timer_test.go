@@ -9,12 +9,25 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// The observed passage of time can be greater than a timer's configured duration for many reasons:
+//   - A timer can fire a bit late.
+//   - The test code might be a bit slow when creating a new timer.
+//   - The test code might be a bit slow when reacting to a fired timer.
+//   - The resolution of the system clock might be poor.
+//
+// To accommodate these potential delays, this margin is added to the timer duration d to allow
+// times in the half-open range [d, d+margin).  (Timers should never fire early, and elapsed time
+// should never be negative, so the margin is not subtracted from the early side of the range, only
+// added to the late side.)
+const margin = 100 * time.Millisecond
+
 func TestNullTimout(t *testing.T) {
 	start := time.Now()
 	timer := NewTimer(0)
 	<-timer.C
-	if int(time.Since(start).Seconds()) != 0 {
-		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got >= margin {
+		t.Errorf("timer fired too late; got duration %v, want 0s", got)
 	}
 }
 
@@ -22,50 +35,57 @@ func TestNegativeTimout(t *testing.T) {
 	start := time.Now()
 	timer := NewTimer(-1)
 	<-timer.C
-	if int(time.Since(start).Seconds()) != 0 {
-		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got >= margin {
+		t.Errorf("timer fired too late; got duration %v, want 0s", got)
 	}
 
 	start = time.Now()
 	timer = NewTimer(-100 * time.Second)
 	<-timer.C
-	if int(time.Since(start).Seconds()) != 0 {
-		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
+	got = time.Since(start)
+	if got >= margin {
+		t.Errorf("timer fired too late; got duration %v, want 0s", got)
 	}
 }
 
 func TestTimeValue(t *testing.T) {
+	const want = time.Second
 	start := time.Now()
-	timer := NewTimer(time.Second)
-	v := <-timer.C
-	if diff := v.Sub(start).Seconds(); int(diff) != 1 {
-		t.Errorf("invalid time value: %v", int(diff))
+	timer := NewTimer(want)
+	end := <-timer.C
+	got := end.Sub(start)
+	if got < want || got >= want+margin {
+		t.Errorf("reported time is wrong; got duration %v, want %v", got, want)
 	}
 }
 
 func TestSingleTimout(t *testing.T) {
+	const want = time.Second
 	start := time.Now()
-	timer := NewTimer(time.Second)
+	timer := NewTimer(want)
 	<-timer.C
-	if int(time.Since(start).Seconds()) != 1 {
-		t.Errorf("took ~%v seconds, should be ~1 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
 func TestMultipleTimouts(t *testing.T) {
+	const want = time.Second
 	start := time.Now()
 	var timers []*Timer
 
 	for i := 0; i < 1000; i++ {
-		timers = append(timers, NewTimer(time.Second))
+		timers = append(timers, NewTimer(want))
 	}
 
 	for _, timer := range timers {
 		<-timer.C
 	}
-
-	if int(time.Since(start).Seconds()) != 1 {
-		t.Errorf("took ~%v seconds, should be ~1 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer(s) fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
@@ -80,9 +100,10 @@ func TestMultipleDifferentTimouts(t *testing.T) {
 	for _, timer := range timers {
 		<-timer.C
 	}
-
-	if int(time.Since(start).Seconds()) != 3 {
-		t.Errorf("took ~%v seconds, should be ~3 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	const want = 3 * time.Second
+	if got < want || got >= want+margin {
+		t.Errorf("timer(s) fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
@@ -92,15 +113,17 @@ func TestStoppedTimer(t *testing.T) {
 		t.Errorf("invalid stopped timer when value")
 	}
 
+	const want = time.Second
 	start := time.Now()
-	wasActive := timer.Reset(time.Second)
+	wasActive := timer.Reset(want)
 	if wasActive {
 		t.Errorf("stopped timer: was active is true")
 	}
 
 	<-timer.C
-	if int(time.Since(start).Seconds()) != 1 {
-		t.Errorf("took ~%v seconds, should be ~1 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
@@ -168,29 +191,31 @@ func TestMultipleStop(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
+	want := 2 * time.Second
 	start := time.Now()
-	timer := NewTimer(time.Second)
-	wasActive := timer.Reset(2 * time.Second)
+	timer := NewTimer(want / 2)
+	wasActive := timer.Reset(want)
 	if !wasActive {
 		t.Errorf("reset timer: was active is false")
 	}
 
 	<-timer.C
-
-	if int(time.Since(start).Seconds()) != 2 {
-		t.Errorf("took ~%v seconds, should be ~2 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 	}
 
+	want = time.Second
 	start = time.Now()
-	wasActive = timer.Reset(time.Second)
+	wasActive = timer.Reset(want)
 	if wasActive {
 		t.Errorf("reset timer: was active is true")
 	}
 
 	<-timer.C
-
-	if int(time.Since(start).Seconds()) != 1 {
-		t.Errorf("took ~%v seconds, should be ~1 seconds\n", int(time.Since(start).Seconds()))
+	got = time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
@@ -199,35 +224,38 @@ func TestNegativeReset(t *testing.T) {
 	timer := NewTimer(time.Second)
 	timer.Reset(-1)
 	<-timer.C
-	if int(time.Since(start).Seconds()) != 0 {
-		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got >= margin {
+		t.Errorf("timer fired too late; got duration %v, want 0s", got)
 	}
 
 	start = time.Now()
 	timer = NewTimer(time.Second)
 	timer.Reset(-100 * time.Second)
 	<-timer.C
-	if int(time.Since(start).Seconds()) != 0 {
-		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
+	got = time.Since(start)
+	if got >= margin {
+		t.Errorf("timer fired too late; got duration %v, want 0s", got)
 	}
 }
 
 func TestMultipleResets(t *testing.T) {
+	const want = 2 * time.Second
 	start := time.Now()
 	var timers []*Timer
 
 	for i := 0; i < 1000; i++ {
-		timer := NewTimer(time.Second)
+		timer := NewTimer(want / 2)
 		timers = append(timers, timer)
-		timer.Reset(2 * time.Second)
+		timer.Reset(want)
 	}
 
 	for _, timer := range timers {
 		<-timer.C
 	}
-
-	if int(time.Since(start).Seconds()) != 2 {
-		t.Errorf("took ~%v seconds, should be ~2 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
@@ -244,9 +272,9 @@ func TestMultipleZeroResets(t *testing.T) {
 	for _, timer := range timers {
 		<-timer.C
 	}
-
-	if int(time.Since(start).Seconds()) != 0 {
-		t.Errorf("took ~%v seconds, should be ~0 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got >= margin {
+		t.Errorf("timer(s) fired too late; got duration %v, want 0s", got)
 	}
 }
 
@@ -258,7 +286,9 @@ func TestResetChannelClear(t *testing.T) {
 		t.Errorf("reset timer: channel should be filled")
 	}
 
-	wasActive := timer.Reset(2 * time.Second)
+	const want = 2 * time.Second
+	start := time.Now()
+	wasActive := timer.Reset(want)
 	if wasActive {
 		t.Errorf("reset timer: was active is true")
 	}
@@ -267,11 +297,10 @@ func TestResetChannelClear(t *testing.T) {
 		t.Errorf("reset timer: channel should be empty")
 	}
 
-	start := time.Now()
 	<-timer.C
-
-	if int(time.Since(start).Seconds()) != 2 {
-		t.Errorf("took ~%v seconds, should be ~2 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
@@ -288,24 +317,25 @@ func TestResetPanic(t *testing.T) {
 }
 
 func TestResetBehavior(t *testing.T) {
+	const want = 3 * time.Second
 	start := time.Now()
 
-	timer := NewTimer(1 * time.Second)
+	timer := NewTimer(want / 3)
 
 	// Let the timer fill the channel.
-	time.Sleep(2 * time.Second)
+	time.Sleep(2 * want / 3)
 
 	// Reset the timer without draining the channel manually.  The channel should be automatically
 	// drained -- this should behave the same as creating a new timer except the same channel is
 	// reused.
-	timer.Reset(1 * time.Second)
+	timer.Reset(want / 3)
 
 	// If timer was a *time.Timer, this receive would not block because the channel would not be
 	// drained from the previous fire.  See <https://github.com/golang/go/issues/11513>.
 	<-timer.C
-
-	if int(time.Since(start).Seconds()) != 3 {
-		t.Errorf("took ~%v seconds, should be ~3 seconds\n", int(time.Since(start).Seconds()))
+	got := time.Since(start)
+	if got < want || got >= want+margin {
+		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 	}
 }
 
@@ -313,15 +343,14 @@ func TestMultipleTimersForValidTimeouts(t *testing.T) {
 	var gr errgroup.Group
 
 	for i := 0; i < 1000; i++ {
-		dur := time.Duration(i%11) * time.Second
+		want := time.Duration(i%11) * time.Second
 		start := time.Now()
-		timer := NewTimer(dur)
+		timer := NewTimer(want)
 		gr.Go(func() error {
-			dur /= time.Second
 			<-timer.C
-			if int(time.Since(start).Seconds()) != int(dur) {
-				return fmt.Errorf("took ~%v seconds, should be ~%v seconds\n",
-					int(time.Since(start).Seconds()), int(dur))
+			got := time.Since(start)
+			if got < want || got >= want+margin {
+				return fmt.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
 			}
 			return nil
 		})
