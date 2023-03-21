@@ -106,8 +106,8 @@ func TestMultipleTimouts(t *testing.T) {
 	const want = time.Second
 	start := time.Now()
 	for i := 0; i < 1000; i++ {
-		timer := NewTimer(want)
 		gr.Go(func() error {
+			timer := NewTimer(want)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -132,8 +132,8 @@ func TestMultipleDifferentTimouts(t *testing.T) {
 	start := time.Now()
 	for i := 0; i < 1000; i++ {
 		want := time.Duration(i%4) * time.Second
-		timer := NewTimer(want)
 		gr.Go(func() error {
+			timer := NewTimer(want)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -316,9 +316,9 @@ func TestMultipleResets(t *testing.T) {
 	const want = 2 * time.Second
 	start := time.Now()
 	for i := 0; i < 1000; i++ {
-		timer := NewTimer(want / 2)
-		timer.Reset(want)
 		gr.Go(func() error {
+			timer := NewTimer(want / 2)
+			timer.Reset(want)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -342,9 +342,9 @@ func TestMultipleZeroResets(t *testing.T) {
 	gr, ctx := errgroup.WithContext(ctx)
 	start := time.Now()
 	for i := 0; i < 1000; i++ {
-		timer := NewTimer(time.Second)
-		timer.Reset(0)
 		gr.Go(func() error {
+			timer := NewTimer(time.Second)
+			timer.Reset(0)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -442,8 +442,8 @@ func TestMultipleTimersForValidTimeouts(t *testing.T) {
 	start := time.Now()
 	for i := 0; i < 1000; i++ {
 		want := time.Duration(i%11) * time.Second
-		timer := NewTimer(want)
 		gr.Go(func() error {
+			timer := NewTimer(want)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -467,8 +467,8 @@ func TestMultipleTimersConcurrentAddRemove(t *testing.T) {
 	gr, ctx := errgroup.WithContext(ctx)
 
 	for i := 0; i < 100000; i++ {
-		timer := NewTimer(time.Nanosecond)
 		gr.Go(func() error {
+			timer := NewTimer(time.Nanosecond)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
