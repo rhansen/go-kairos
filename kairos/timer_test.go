@@ -102,48 +102,52 @@ func TestSingleTimout(t *testing.T) {
 func TestMultipleTimouts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
+	gr, ctx := errgroup.WithContext(ctx)
 	const want = time.Second
 	start := time.Now()
-	var timers []*Timer
-
 	for i := 0; i < 1000; i++ {
-		timers = append(timers, NewTimer(want))
+		timer := NewTimer(want)
+		gr.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				got := time.Since(start)
+				if got < want || got >= want+margin {
+					return fmt.Errorf("timer(s) fired at wrong time; got duration %v, want %v", got, want)
+				}
+				return nil
+			}
+		})
 	}
-
-	for _, timer := range timers {
-		select {
-		case <-ctx.Done():
-			t.Error(ctx.Err())
-		case <-timer.C:
-		}
-	}
-	got := time.Since(start)
-	if got < want || got >= want+margin {
-		t.Errorf("timer(s) fired at wrong time; got duration %v, want %v", got, want)
+	if err := gr.Wait(); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestMultipleDifferentTimouts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
+	gr, ctx := errgroup.WithContext(ctx)
 	start := time.Now()
-	var timers []*Timer
-
 	for i := 0; i < 1000; i++ {
-		timers = append(timers, NewTimer(time.Duration(i%4)*time.Second))
+		want := time.Duration(i%4) * time.Second
+		timer := NewTimer(want)
+		gr.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				got := time.Since(start)
+				if got < want || got >= want+margin {
+					return fmt.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
+				}
+				return nil
+			}
+		})
 	}
-
-	for _, timer := range timers {
-		select {
-		case <-ctx.Done():
-			t.Error(ctx.Err())
-		case <-timer.C:
-		}
-	}
-	got := time.Since(start)
-	const want = 3 * time.Second
-	if got < want || got >= want+margin {
-		t.Errorf("timer(s) fired at wrong time; got duration %v, want %v", got, want)
+	if err := gr.Wait(); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -308,51 +312,53 @@ func TestNegativeReset(t *testing.T) {
 func TestMultipleResets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
+	gr, ctx := errgroup.WithContext(ctx)
 	const want = 2 * time.Second
 	start := time.Now()
-	var timers []*Timer
-
 	for i := 0; i < 1000; i++ {
 		timer := NewTimer(want / 2)
-		timers = append(timers, timer)
 		timer.Reset(want)
+		gr.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				got := time.Since(start)
+				if got < want || got >= want+margin {
+					return fmt.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
+				}
+				return nil
+			}
+		})
 	}
-
-	for _, timer := range timers {
-		select {
-		case <-ctx.Done():
-			t.Error(ctx.Err())
-		case <-timer.C:
-		}
-	}
-	got := time.Since(start)
-	if got < want || got >= want+margin {
-		t.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
+	if err := gr.Wait(); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestMultipleZeroResets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
+	gr, ctx := errgroup.WithContext(ctx)
 	start := time.Now()
-	var timers []*Timer
-
 	for i := 0; i < 1000; i++ {
 		timer := NewTimer(time.Second)
-		timers = append(timers, timer)
 		timer.Reset(0)
+		gr.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				got := time.Since(start)
+				if got >= margin {
+					return fmt.Errorf("timer fired too late; got duration %v, want 0s", got)
+				}
+				return nil
+			}
+		})
 	}
-
-	for _, timer := range timers {
-		select {
-		case <-ctx.Done():
-			t.Error(ctx.Err())
-		case <-timer.C:
-		}
-	}
-	got := time.Since(start)
-	if got >= margin {
-		t.Errorf("timer(s) fired too late; got duration %v, want 0s", got)
+	if err := gr.Wait(); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -433,9 +439,9 @@ func TestMultipleTimersForValidTimeouts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	gr, ctx := errgroup.WithContext(ctx)
+	start := time.Now()
 	for i := 0; i < 1000; i++ {
 		want := time.Duration(i%11) * time.Second
-		start := time.Now()
 		timer := NewTimer(want)
 		gr.Go(func() error {
 			select {
