@@ -317,3 +317,43 @@ func TestResetPanic(t *testing.T) {
 	timer := &Timer{}
 	timer.Reset(0)
 }
+
+func prefillTimers(b *testing.B, n int) {
+	// Pre-fill a bunch of timers that will never fire (to stress heap management).
+	timers := make([]*Timer, 0, n)
+	for i := 0; i < n; i++ {
+		timers = append(timers, NewTimer(math.MaxInt64*time.Nanosecond))
+	}
+	b.Cleanup(func() {
+		for _, timer := range timers {
+			timer.Stop()
+		}
+	})
+}
+
+func BenchmarkNewTimerRapidFire(b *testing.B) {
+	for _, n := range []int{0, 1e2, 1e4, 1e6} {
+		b.Run(fmt.Sprintf("pre-filled %v", n), func(b *testing.B) {
+			prefillTimers(b, n)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				timer := NewTimer(0)
+				<-timer.C
+			}
+		})
+	}
+}
+
+func BenchmarkTimerResetRapidFire(b *testing.B) {
+	for _, n := range []int{0, 1e2, 1e4, 1e6} {
+		b.Run(fmt.Sprintf("pre-filled %v", n), func(b *testing.B) {
+			prefillTimers(b, n)
+			timer := NewStoppedTimer()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				timer.Reset(0)
+				<-timer.C
+			}
+		})
+	}
+}
