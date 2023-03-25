@@ -22,7 +22,10 @@ func newClock() *clock {
 // NewTimer creates a new [Timer] and starts it with duration d.
 func (clk *clock) NewTimer(d time.Duration) *Timer {
 	t := clk.NewStoppedTimer()
-	clk.addTimer(t, d)
+	t.when = time.Now().Add(d)
+	clk.mutex.Lock()
+	defer clk.mutex.Unlock()
+	clk.addTimerLocked(t)
 	return t
 }
 
@@ -33,14 +36,6 @@ func (clk *clock) NewStoppedTimer() *Timer {
 }
 
 // Add the timer to the heap.
-func (clk *clock) addTimer(t *Timer, d time.Duration) {
-	t.when = time.Now().Add(d)
-
-	clk.mutex.Lock()
-	clk.addTimerLocked(t)
-	clk.mutex.Unlock()
-}
-
 func (clk *clock) addTimerLocked(t *Timer) {
 	clk.timers.Insert(t)
 	// Reschedule if this is the next timer in the heap.
