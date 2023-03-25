@@ -40,7 +40,11 @@ func (clk *clock) addTimerLocked(t *Timer) {
 	clk.timers.Insert(t)
 	// Reschedule if this is the next timer in the heap.
 	if clk.timers.Peek() == t {
-		clk.reschedule()
+		// Do not block if there is already a pending reschedule request.
+		select {
+		case clk.rescheduleC <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -76,14 +80,6 @@ func (clk *clock) resetTimer(t *Timer, d time.Duration) (b bool) {
 	clk.addTimerLocked(t)
 	clk.mutex.Unlock()
 	return
-}
-
-func (clk *clock) reschedule() {
-	// Do not block if there is already a pending reschedule request.
-	select {
-	case clk.rescheduleC <- struct{}{}:
-	default:
-	}
 }
 
 func (clk *clock) timerRoutine() {
