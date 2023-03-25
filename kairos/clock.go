@@ -22,10 +22,7 @@ func newClock() *clock {
 // NewTimer creates a new [Timer] and starts it with duration d.
 func (clk *clock) NewTimer(d time.Duration) *Timer {
 	t := clk.NewStoppedTimer()
-	t.when = time.Now().Add(d)
-	clk.mutex.Lock()
-	defer clk.mutex.Unlock()
-	clk.addTimerLocked(t)
+	clk.resetTimer(t, d)
 	return t
 }
 
