@@ -32,19 +32,6 @@ func (clk *clock) NewStoppedTimer() *Timer {
 	return &Timer{C: c, c: c}
 }
 
-// Add the timer to the heap.
-func (clk *clock) addTimerLocked(t *Timer) {
-	clk.timers.Insert(t)
-	// Reschedule if this is the next timer in the heap.
-	if clk.timers.Peek() == t {
-		// Do not block if there is already a pending reschedule request.
-		select {
-		case clk.rescheduleC <- struct{}{}:
-		default:
-		}
-	}
-}
-
 // Delete timer t from the heap.
 // It returns true if t was removed, false if t wasn't even there.
 // Do not need to update the timer routine: if it wakes up early, no big deal.
@@ -66,7 +53,15 @@ func (clk *clock) resetTimer(t *Timer, d time.Duration) (b bool) {
 	default:
 	}
 	t.when = time.Now().Add(d)
-	clk.addTimerLocked(t)
+	clk.timers.Insert(t)
+	// Reschedule if this is the next timer in the heap.
+	if clk.timers.Peek() == t {
+		// Do not block if there is already a pending reschedule request.
+		select {
+		case clk.rescheduleC <- struct{}{}:
+		default:
+		}
+	}
 	clk.mutex.Unlock()
 	return
 }
