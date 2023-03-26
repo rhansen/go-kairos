@@ -138,8 +138,11 @@ Loop:
 			continue Loop
 		}
 
-		// Timer expired. Trigger the timer's function callback.
-		t.f(now)
+		// Timer expired.
+		select {
+		case t.c <- now:
+		default:
+		}
 
 		// Remove from heap.
 		last = len(timers) - 1

@@ -10,13 +10,10 @@ import (
 // A Timer must be created with NewTimer. NewStoppedTimer or AfterFunc.
 type Timer struct {
 	C <-chan time.Time
+	c chan<- time.Time // Same channel as C.
 
 	i    int       // heap index.
 	when time.Time // Timer wakes up at when.
-
-	// f is called in a locked context on timeout. This function must not block
-	// and must behave well-defined.
-	f func(t time.Time)
 }
 
 // NewTimer creates a new Timer that will send the current time on its
@@ -30,17 +27,7 @@ func NewTimer(d time.Duration) *Timer {
 // NewStoppedTimer creates a new stopped Timer.
 func NewStoppedTimer() *Timer {
 	c := make(chan time.Time, 1)
-	t := &Timer{
-		C: c,
-		f: func(t time.Time) {
-			// Don't block.
-			select {
-			case c <- t:
-			default:
-			}
-		},
-	}
-	return t
+	return &Timer{C: c, c: c}
 }
 
 // Stop prevents the Timer from firing.
@@ -49,7 +36,7 @@ func NewStoppedTimer() *Timer {
 // Stop does not close the channel, to prevent a read from
 // the channel succeeding incorrectly.
 func (t *Timer) Stop() (wasActive bool) {
-	if t.f == nil {
+	if t.c == nil {
 		panic("timer: Stop called on uninitialized Timer")
 	}
 	return delTimer(t)
@@ -61,7 +48,7 @@ func (t *Timer) Stop() (wasActive bool) {
 // The channel t.C is cleared and calling t.Reset() behaves as creating a
 // new Timer.
 func (t *Timer) Reset(d time.Duration) bool {
-	if t.f == nil {
+	if t.c == nil {
 		panic("timer: Reset called on uninitialized Timer")
 	}
 	return resetTimer(t, d)
