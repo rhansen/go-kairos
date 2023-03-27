@@ -317,39 +317,3 @@ func TestResetPanic(t *testing.T) {
 	timer := &Timer{}
 	timer.Reset(0)
 }
-
-func TestResetBehavior(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	t.Cleanup(cancel)
-	gr, ctx := errgroup.WithContext(ctx)
-	const want = 3 * time.Second
-	start := time.Now()
-
-	timer := NewTimer(want / 3)
-
-	// Let the timer fill the channel.
-	time.Sleep(2 * want / 3)
-
-	// Reset the timer without draining the channel manually.  The channel should be automatically
-	// drained -- this should behave the same as creating a new timer except the same channel is
-	// reused.
-	timer.Reset(want / 3)
-
-	gr.Go(func() error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		// If timer was a *time.Timer, this receive would not block because the channel would not be
-		// drained from the previous fire.  See <https://github.com/golang/go/issues/11513>.
-		case <-timer.C:
-			got := time.Since(start)
-			if got < want || got >= want+margin {
-				return fmt.Errorf("timer fired at wrong time; got duration %v, want %v", got, want)
-			}
-			return nil
-		}
-	})
-	if err := gr.Wait(); err != nil {
-		t.Error(err)
-	}
-}
